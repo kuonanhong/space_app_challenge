@@ -66,16 +66,21 @@ class KML(object):
   HEADER = '<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://earth.google.com/kml/2.0"><Document><LookAt id="lookat_id"><longitude>0.0</longitude><latitude>0.0</latitude><range>1.2770075427617017E7</range><tilt>0.0000</tilt><heading>0.0000</heading></LookAt>'
   END = '</Document></kml>'
 
-  def __init__(self, png_files):
+  def __init__(self, png_files, args):
+    self.args = args
     self.png_files = png_files
     self.ground_overlays = []
     self.get_ground_overlays()
     self.set_time_end_using_next_overlay()
 
   def get_ground_overlays(self):
+    opacity = None
+    if self.args.opacity:
+      opacity = self.args.opacity
+
     for png_file in self.png_files:
       png_file_name = os.path.basename(png_file)
-      ground_overlay = GroundOverlay(png_file_name)
+      ground_overlay = GroundOverlay(png_file_name, opacity)
       self.ground_overlays.append(ground_overlay)
 
   def set_time_end_using_next_overlay(self):
@@ -100,10 +105,11 @@ class KML(object):
 class GroundOverlay(object):
   LATLONBOX = '<LatLonBox id="lookat_id"><north>90.0</north><east>180.0</east><south>-90.0</south><west>-180.0</west></LatLonBox>'
 
-  def __init__(self, file_name):
+  def __init__(self, file_name, opacity):
     self.file_name = file_name
     self.time_start = get_date_from_file_name(file_name)
     self.time_end = None
+    self.opacity = opacity
 
   def get_time_span_element(self):
     ret = '<TimeSpan>\n'
@@ -112,6 +118,14 @@ class GroundOverlay(object):
     if self.time_end:
       ret += '<end>%s</end>\n' % get_date_string(self.time_end)
     ret += '</TimeSpan>\n'
+    return ret
+
+  def get_opacity_element(self):
+    if not self.opacity:
+      return
+    ret = '<color>'
+    ret += '%sffffff' % self.opacity
+    ret += '</color>\n'
     return ret
 
   def get_name_element(self):
@@ -130,6 +144,7 @@ class GroundOverlay(object):
     ret = '<GroundOverlay>' + '\n'
     ret += self.get_name_element()
     ret += self.get_time_span_element()
+    ret += self.get_opacity_element()
     ret += self.get_icon_element()
     ret += self.get_latlonbox_element()
     ret += '</GroundOverlay>'
@@ -145,6 +160,9 @@ def parse_args():
   # Args for input.
   parser.add_argument('-i', '--input_folder', required=True,
                       help='Folder containing png files.')
+  # Args for opacity.
+  parser.add_argument('-p', '--opacity', type=str,
+                      help='Opacity, a string 00 to ff')
   # Args for result.
   parser.add_argument('-o', '--out_kml_name', required=True,
                       help='Name for output kml and kmz file.')
@@ -186,7 +204,7 @@ def run_app():
   png_files = get_png_files_in_cwd()
   logging.debug('Found files %s', png_files)
 
-  kml = KML(png_files)
+  kml = KML(png_files, args)
 
   kml_file = '%s.kml' % args.out_kml_name
   kmz_file = '%s.kmz' % args.out_kml_name
