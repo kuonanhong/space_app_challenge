@@ -1,1 +1,3 @@
 *.hdf
+.DS_Store
+/env
